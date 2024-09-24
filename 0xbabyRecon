@@ -61,7 +61,7 @@ echo -e "${BLUE}[INFO]${NC}SubFinder DONE"
 
 # using amass
 
-timeout 1000s amass enum -active -d $DOMAIN > ${DIR}/amassResults.txt
+timeout 1000s amass enum -passive -d $DOMAIN > ${DIR}/amassResults.txt
 echo -e "${BLUE}[INFO]${NC} Amass DONE"
 cat ${DIR}/amassResults.txt | grep -oP '^[^\s]+' | grep -E -v '^[0-9]+$|^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(/[0-9]+)?$|^[0-9a-fA-F]{1,4}(:[0-9a-fA-F]{1,4})+(/[0-9]+)?$|^[0-9a-fA-F:]+(/[0-9]+)?$' > ${DIR}/amassDomains.txt
 
@@ -89,11 +89,19 @@ fi
 #	exit 1
 #fi 
 # checking alive subdomains
-echo -e "${BLUE}[INFO]${NC}Checking For Alive and non-alive subdomains with status Code with httpx tool"  
+echo -e "${BLUE}[INFO]${NC}Checking For Alive and non-alive subdomains with status Code with httpx tool" 
 httpx -l ${DIR}/COMB.txt -sc -location -random-agent -rate-limit 20 -threads 5 -retries 3  > ${DIR}/httpxresults.txt
 # sorting the subdomains based on the status code
 echo -e "${BLUE}[INFO]${NC}HTTPX done"
-# creating Fixed Function for viewing the File and remove the hidden character like colors form the httpx file 
+endpoints() {
+        while read -r URL; do sanitized_url=$(echo "$URL" | tr ':/' '__'); echo "$URL" | waybackurls 2>/dev/null >> $1/${sanitized_url}; done < $2/URLs.txt
+        echo -e "${BLUE}[INFO]${NC} WayBackURLs DONE $4 Status Code"
+        while read -r URL; do sanitized_url=$(echo "$URL" | tr ':/' '__'); echo "$URL" | gau 2>/dev/null >> $3/${sanitized_url}; done < $2/URLs.txt
+        echo -e "${BLUE}[INFO]${NC}Gau DONE $4 Status Code"
+        echo -e "${BLUE}[INFO]${NC}Done with $4 statusCode URLs"
+}
+
+# creating Fixed Function for viewing the File and remove the hidden character like colors form the htt>
 echo -e "${BLUE}[INFO]${NC}Sorting and Creating DIRs for each status Code"
 state_code() { 
     # Removing ANSI escape codes
@@ -107,32 +115,35 @@ state_code() {
     mkdir -p ${gau}
     # Perform the grep operation and check if it returns any results
     echo "$sed_output" | grep -E "\[$1\]" > ${DIRSTATUSCODE}/httpxURLS.txt
-    if [ $1 -eq 200 ]; then
-	echo -e "${BLUE}[INFO]${NC}Starting Gau and waybackURLs tools for 200 statusCode"
-	# find all the endpoints to specific URLs using wayback and gau
-	cat ${DIRSTATUSCODE}/httpxURLS.txt | awk {'print $1'} > ${DIRSTATUSCODE}/URLs.txt
-        while read -r URL; do sanitized_url=$(echo "$URL" | tr ':/' '__'); echo "$URL" | waybackurls 2>/dev/null >> ${waybackurl}/${sanitized_url}; done < ${DIRSTATUSCODE}/URLs.txt
-	while read -r URL; do sanitized_url=$(echo "$URL" | tr ':/' '__'); echo "$URL" | gau 2>/dev/null >> ${gau}/${sanitized_url}; done < ${DIRSTATUSCODE}/URLs.txt
-	echo -e "${BLUE}[INFO]${NC}Done with 200 statusCode URLs" 
+    if  [ $1 -eq 200 ]; then
+        echo -e "${BLUE}[INFO]${NC}Starting Gau and waybackURLs tools for 200 statusCode"
+        # find all the endpoints to specific URLs using wayback and gau
+        cat ${DIRSTATUSCODE}/httpxURLS.txt | awk {'print $1'} > ${DIRSTATUSCODE}/URLs.txt
+        endpoints ${waybackurl} ${DIRSTATUSCODE} ${gau} 200
     elif [ $1 -eq 301 ]; then 
-	echo -e "${BLUE}[INFO]${NC} For 301 status Code"
-	cat ${DIRSTATUSCODE}/httpxURLS.txt | awk {'print $3'} | sed 's/^\[//; s/\]$//' > ${DIRSTATUSCODE}/URLs.txt
-        while read -r URL; do sanitized_url=$(echo "$URL" | tr ':/' '__'); echo "$URL" | waybackurls 2>/dev/null >> ${waybackurl}/${sanitized_url}; done < ${DIRSTATUSCODE}/URLs.txt 
-        while read -r URL; do sanitized_url=$(echo "$URL" | tr ':/' '__'); echo "$URL" | gau 2>/dev/null >> ${gau}/${sanitized_url}; done < ${DIRSTATUSCODE}/URLs.txt
-	echo -e "${BLUE}[INFO]${NC}Done with 301 statusCode URLs"
-    else 
-	echo "403 , 404 and 302 status code in complete"
+        echo -e "${BLUE}[INFO]${NC} For 301 status Code"
+        cat ${DIRSTATUSCODE}/httpxURLS.txt | awk {'print $3'} | sed 's/^\[//; s/\]$//' > ${DIRSTATUSCODE}/URLs.txt
+        endpoints ${waybackurl} ${DIRSTATUSCODE} ${gau} 301
+    elif [ $1 -eq 404 ]; then 
+        echo -e "${BLUE}[INFO]${NC} For 404 status Code"
+        cat ${DIRSTATUSCODE}/httpxURLS.txt | awk {'print $1'} > ${DIRSTATUSCODE}/URLs.txt
+        endpoints ${waybackurl} ${DIRSTATUSCODE} ${gau} 404
+    elif [ $1 -eq 403 ]; then 
+        echo =e -e "${BLUE}[INFO]${NC} For 403 status code"
+        cat ${DIRSTATUSCODE}/httpxURLS.txt | awk {'print $1'} > ${DIRSTATUSCODE}/URLs.txt 
+        endpoints ${waybackurl} ${DIRSTATUSCODE} ${gau} 403 
     fi 
 
 }
-
 if [ $? -eq 0 ]; then
-	state_code 200 
-	state_code 301 
-	state_code 403
-	state_code 302
+        state_code 200 
+        state_code 403
+        state_code 301 
+        state_code 404
+        state_code 302
 fi 
-echo -e "${BLUE}[INFO]${NC}RECON DONE WITH 0xbabyRecon"
+
+echo -e "${BLUE}[INFO]${NC}RECON DONE WITH 0xbabyRecon ${TODAY}"
 	#cat ${URLs_200} ${URLs_301} > ${DIR}/CoM_301_200
 	#creating Directories for URLs based on the status code 
 #	URLs_403=$(mkdir ${DIR}/403_URLs)
