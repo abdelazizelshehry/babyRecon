@@ -45,7 +45,7 @@ if [ -f $file ]; then
 	ipv4=$(cat $file | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' > ${DIR}/host/ipv4)
 	ipv6=$(cat $file | grep -oE '\b([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}\b' > ${DIR}/host/ipv6)
 	echo -e "${BLUE}[INFO]${NC}Doing NMAP for IPV4 found in IPsOFhost.txt in Host DIR it may take few time. Please Wait"
-	#while read -r IP; do nmap -sV -Pn -sC -O -T2 "$IP" -oA "$IP_NMAPresults"; done < ${DIR}/host/ipv4
+	while read -r IP; do nmap -sV -Pn -sC -O -T2 "$IP" -oA "$IP_NMAPresults"; done < ${DIR}/host/ipv4
 fi
 # make subdomain enumration
 
