@@ -45,7 +45,7 @@ if [ -f $file ]; then
 	ipv4=$(cat $file | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' > ${DIR}/host/ipv4)
 	ipv6=$(cat $file | grep -oE '\b([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}\b' > ${DIR}/host/ipv6)
 	echo -e "${BLUE}[INFO]${NC}Doing NMAP for IPV4 found in IPsOFhost.txt in Host DIR it may take few time. Please Wait"
-	while read -r IP; do nmap -sV -Pn -sC -O -T2 "$IP" -oA "$IP_NMAPresults"; done < ${DIR}/host/ipv4
+	#while read -r IP; do nmap -sV -Pn -sC -O -T2 "$IP" -oA "$IP_NMAPresults"; done < ${DIR}/host/ipv4
 fi
 # make subdomain enumration
 
@@ -91,15 +91,18 @@ fi
 #fi 
 # checking alive subdomains
 echo -e "${BLUE}[INFO]${NC}Checking For Alive and non-alive subdomains with status Code with httpx tool" 
-httpx -l ${DIR}/COMB.txt -sc -location -random-agent -rate-limit 20 -threads 5 -retries 3  > ${DIR}/httpxresults.txt
+httpx -l ${DIR}/COMB.txt -sc -location -random-agent -rate-limit 20 -threads 5 -retries 3 2>/dev/null  > ${DIR}/httpxresults.txt
 # sorting the subdomains based on the status code
 echo -e "${BLUE}[INFO]${NC}HTTPX done"
 endpoints() {
-        while read -r URL; do sanitized_url=$(echo "$URL" | tr ':/' '__'); echo "$URL" | waybackurls 2>/dev/null >> $1/${sanitized_url}; done < $2/URLs.txt
-        echo -e "${BLUE}[INFO]${NC} WayBackURLs DONE $4 Status Code"
-        while read -r URL; do sanitized_url=$(echo "$URL" | tr ':/' '__'); echo "$URL" | gau 2>/dev/null >> $3/${sanitized_url}; done < $2/URLs.txt
-        echo -e "${BLUE}[INFO]${NC}Gau DONE $4 Status Code"
-        echo -e "${BLUE}[INFO]${NC}Done with $4 statusCode URLs"
+	# find all endpoints Using waybackurls and gau tools 
+        while read -r DOMAINNAME; do echo "$DOMAINNAME" | waybackurls 2>/dev/null >> $1/${DOMAINNAME}; done < $2/domains.txt
+        echo -e "${BLUE}[INFO]${NC} WayBackURLs DONE for $5 Status Code"
+        while read -r DOMAINNAME; do echo "$DOMAINNAME" | gau 2>/dev/null >> $3/${DOMAINNAME}; done < $2/domains.txt
+        echo -e "${BLUE}[INFO]${NC}Gau DONE for $5 Status Code"
+	# Doing Paramspider to find parameters to FUZZ for all domains  specific to status code of it 
+	while read -r DOMAINNAME; do paramspider -d "$DOMAINNAME" -s 2>/dev/null >> $4/${DOMAINNAME}; done < $2/domains.txt
+	echo -e "${BLUE}[INFO]${NC}ParamSpider DONE for $5 status code"
 }
 
 # creating Fixed Function for viewing the File and remove the hidden character like colors form the htt>
@@ -110,10 +113,12 @@ state_code() {
     sed_output=$(cat ${DIR}/httpxresults.txt | sed 's/\x1b\[[0-9;]*m//g')
     DIRSTATUSCODE=${DIR}/$1_URLS
     mkdir -p ${DIRSTATUSCODE}
-    waybackurl=${DIRSTATUSCODE}/waybackurlsResults
-    mkdir -p ${waybackurl}
-    gau=${DIRSTATUSCODE}/gauResults
-    mkdir -p ${gau}
+    WAYBACK=${DIRSTATUSCODE}/waybackurlsResults
+    mkdir -p ${WAYBACK}
+    GAU=${DIRSTATUSCODE}/gauResults
+    mkdir -p ${GAU}
+    PARAMSPIDER=${DIRSTATUSCODE}/paramspiderresults
+    mkdir -p ${PARAMSPIDER}
     # Perform the grep operation and check if it returns any results
     echo "$sed_output" | grep -E "\[$1\]" > ${DIRSTATUSCODE}/httpxURLS.txt
     if  [ $1 -eq 200 ]; then
@@ -121,22 +126,26 @@ state_code() {
         # find all the endpoints to specific URLs using wayback and gau
         cat ${DIRSTATUSCODE}/httpxURLS.txt | awk {'print $1'} > ${DIRSTATUSCODE}/URLs.txt
 	sort -u -o ${DIRSTATUSCODE}/URLs.txt ${DIRSTATUSCODE}/URLs.txt
-        endpoints ${waybackurl} ${DIRSTATUSCODE} ${gau} 200
+	cat ${DIRSTATUSCODE}/URLs.txt | sed 's|https\?://||' > ${DIRSTATUSCODE}/domains.txt
+        endpoints ${WAYBACK} ${DIRSTATUSCODE} ${GAU} ${PARAMSPIDER} 200
     elif [ $1 -eq 301 ]; then 
         echo -e "${BLUE}[INFO]${NC} For 301 status Code"
         cat ${DIRSTATUSCODE}/httpxURLS.txt | awk {'print $3'} | sed 's/^\[//; s/\]$//' > ${DIRSTATUSCODE}/URLs.txt
 	sort -u -o ${DIRSTATUSCODE}/URLs.txt ${DIRSTATUSCODE}/URLs.txt
-        endpoints ${waybackurl} ${DIRSTATUSCODE} ${gau} 301
+	cat ${DIRSTATUSCODE}/URLs.txt | sed 's|https\?://||' > ${DIRSTATUSCODE}/domains.txt
+        endpoints ${WAYBACK} ${DIRSTATUSCODE} ${GAU} ${PARAMSPIDER} 301
     elif [ $1 -eq 404 ]; then 
         echo -e "${BLUE}[INFO]${NC} For 404 status Code"
         cat ${DIRSTATUSCODE}/httpxURLS.txt | awk {'print $1'} > ${DIRSTATUSCODE}/URLs.txt
         sort -u -o  ${DIRSTATUSCODE}/URLs.txt ${DIRSTATUSCODE}/URLs.txt
-	endpoints ${waybackurl} ${DIRSTATUSCODE} ${gau} 404
+	cat ${DIRSTATUSCODE}/URLs.txt | sed 's|https\?://||' > ${DIRSTATUSCODE}/domains.txt
+	endpoints ${WAYBACK} ${DIRSTATUSCODE} ${GAU} ${PARAMSPIDER} 404
     elif [ $1 -eq 403 ]; then 
         echo  -e "${BLUE}[INFO]${NC} For 403 status code"
         cat ${DIRSTATUSCODE}/httpxURLS.txt | awk {'print $1'} > ${DIRSTATUSCODE}/URLs.txt 
         sort -u -o ${DIRSTATUSCODE}/URLs.txt  ${DIRSTATUSCODE}/URLs.txt
-	endpoints ${waybackurl} ${DIRSTATUSCODE} ${gau} 403 
+	cat ${DIRSTATUSCODE}/URLs.txt | sed 's|https\?://||' > ${DIRSTATUSCODE}/domains.txt
+	endpoints ${WAYBACK} ${DIRSTATUSCODE} ${GAU} ${PARAMSPIDER} 403 
     fi 
 
 }
