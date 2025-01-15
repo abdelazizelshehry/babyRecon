@@ -1,0 +1,5 @@
+install nmap 
+install go lang -------->>> https://go.dev/doc/install
+install subfinder, sublist3r, amass 
+install httpx ------------->>> https://docs.projectdiscovery.io/tools/httpx/install 
+install waybackurl , gau 
